@@ -1,0 +1,120 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/santoshgopal/ai-tandem/schemas/config.schema.json",
+  "title": "Tandem Config",
+  "description": "Project-level configuration for tandem. Stored at .tandem/config.json in the consumer's ticket store repo or workspace root. Created by tandem init.",
+  "type": "object",
+  "required": ["ticket_prefix", "be_repo", "fe_repo", "tickets_dir"],
+  "additionalProperties": false,
+  "properties": {
+
+    "ticket_prefix": {
+      "type": "string",
+      "pattern": "^[A-Z]+$",
+      "description": "Uppercase project prefix for ticket IDs. Set once during tandem init. Example: 'PROJ', 'APP', 'MYCO'. All ticket IDs will be PREFIX-N."
+    },
+
+    "be_repo": {
+      "type": "string",
+      "description": "Absolute or relative path to the backend repo root. Example: '../my-api' or '/home/user/projects/api'."
+    },
+
+    "fe_repo": {
+      "type": "string",
+      "description": "Absolute or relative path to the frontend repo root. Example: '../my-frontend' or '/home/user/projects/web'."
+    },
+
+    "tickets_dir": {
+      "type": "string",
+      "description": "Absolute or relative path to the directory containing all ticket subdirectories. Each subdirectory is named by ticket ID. Example: './tickets' or '/home/user/projects/tandem-tickets'."
+    },
+
+    "loop": {
+      "type": "boolean",
+      "default": false,
+      "description": "If true, tandem run keeps processing tickets until the queue is empty or it is stopped. If false, tandem run processes one ticket and exits. Default: false (safe default for first runs)."
+    },
+
+    "loop_until": {
+      "type": ["string", "null"],
+      "pattern": "^[A-Z]+-[0-9]+$",
+      "default": null,
+      "description": "Optional. If set, the loop stops after completing this ticket ID, even if more tickets are queued. Useful for processing up to a known milestone."
+    },
+
+    "max_retries": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 5,
+      "default": 2,
+      "description": "Number of times to retry a failed agent run before setting the ticket to error state. 0 means fail immediately on first error. Default: 2."
+    },
+
+    "pause_on_error": {
+      "type": "boolean",
+      "default": true,
+      "description": "If true, the loop pauses (does not exit) when a ticket reaches error state after max_retries. Resume with tandem resume. If false, the loop skips the errored ticket and continues. Default: true."
+    },
+
+    "branch_prefix": {
+      "type": "string",
+      "default": "tandem/",
+      "description": "Git branch name prefix for agent branches. Branches are named: {branch_prefix}{ticket_id}-be and {branch_prefix}{ticket_id}-fe. Example: 'tandem/' produces 'tandem/PROJ-42-be'. Default: 'tandem/'."
+    },
+
+    "open_prs": {
+      "type": "boolean",
+      "default": false,
+      "description": "If true, tandem automatically opens a pull request in each repo when both agents complete a ticket. Requires GITHUB_TOKEN env variable. Default: false."
+    },
+
+    "pr_base_branch": {
+      "type": "string",
+      "default": "main",
+      "description": "The base branch for pull requests. Default: 'main'."
+    },
+
+    "claude_model": {
+      "type": "string",
+      "default": "claude-sonnet-4-20250514",
+      "description": "The Claude model to use for agent runs. Passed to the claude CLI via --model flag. Default: claude-sonnet-4-20250514. Use a more capable model (opus) for complex tickets."
+    },
+
+    "agent_timeout_minutes": {
+      "type": "integer",
+      "minimum": 5,
+      "maximum": 120,
+      "default": 30,
+      "description": "Maximum time in minutes to wait for a single agent run to complete. If exceeded, the run is treated as an error and retried. Default: 30."
+    },
+
+    "contract_timeout_minutes": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 60,
+      "default": 35,
+      "description": "Maximum time in minutes to wait for contract.json to appear after the backend agent starts. Must be greater than agent_timeout_minutes in practice. Default: 35."
+    },
+
+    "notify_webhook": {
+      "type": ["string", "null"],
+      "format": "uri",
+      "default": null,
+      "description": "Optional URL to POST status events to. Payload: { ticket_id, status, repo, branch, pr_url? }. Works with Slack incoming webhooks, Discord webhooks, or any HTTP endpoint."
+    },
+
+    "git_user_name": {
+      "type": "string",
+      "default": "tandem-bot",
+      "description": "Git commit author name for commits made by tandem agents. Default: 'tandem-bot'."
+    },
+
+    "git_user_email": {
+      "type": "string",
+      "format": "email",
+      "default": "tandem@localhost",
+      "description": "Git commit author email for commits made by tandem agents."
+    }
+
+  }
+}

@@ -1,0 +1,120 @@
+{
+  "ticket_id": "DEMO-1",
+  "be_commit": "a1b2c3d",
+  "generated_at": "2026-01-15T11:30:00Z",
+  "base_url_hint": "/api/v1",
+  "auth": {
+    "type": "bearer",
+    "notes": "Token expires in 1 hour. Refresh via POST /auth/refresh."
+  },
+  "endpoints": [
+    {
+      "method": "GET",
+      "path": "/users/:userId/profile",
+      "summary": "Returns the public profile of any user by ID.",
+      "auth_override": "none",
+      "request": {
+        "params": {
+          "userId": { "type": "string", "format": "uuid", "description": "The user's UUID." }
+        }
+      },
+      "response": {
+        "success": {
+          "status": 200,
+          "body": { "$ref": "UserProfile" }
+        },
+        "errors": [
+          { "status": 404, "code": "USER_NOT_FOUND", "description": "No user with this ID exists." }
+        ]
+      }
+    },
+    {
+      "method": "PATCH",
+      "path": "/users/:userId/profile",
+      "summary": "Updates the authenticated user's own name and bio.",
+      "request": {
+        "params": {
+          "userId": { "type": "string", "format": "uuid" }
+        },
+        "body": {
+          "type": "object",
+          "properties": {
+            "name": { "type": "string", "description": "Display name, 1-80 characters." },
+            "bio": { "type": "string", "description": "Short bio, max 300 characters." }
+          }
+        }
+      },
+      "response": {
+        "success": {
+          "status": 200,
+          "body": { "$ref": "UserProfile" }
+        },
+        "errors": [
+          { "status": 403, "code": "FORBIDDEN", "description": "Authenticated user is not the profile owner." },
+          { "status": 422, "code": "VALIDATION_ERROR", "description": "name or bio failed validation." }
+        ]
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/users/:userId/avatar",
+      "summary": "Uploads a new avatar image for the authenticated user.",
+      "request": {
+        "params": {
+          "userId": { "type": "string", "format": "uuid" }
+        },
+        "headers": {
+          "Content-Type": "multipart/form-data"
+        }
+      },
+      "response": {
+        "success": {
+          "status": 200,
+          "body": {
+            "type": "object",
+            "properties": {
+              "avatar_url": { "type": "string", "format": "uri", "description": "Public CDN URL of the uploaded avatar." }
+            },
+            "required": ["avatar_url"]
+          }
+        },
+        "errors": [
+          { "status": 400, "code": "INVALID_FILE_TYPE", "description": "Only JPEG and PNG are accepted." },
+          { "status": 400, "code": "FILE_TOO_LARGE", "description": "File exceeds the 2MB limit." },
+          { "status": 403, "code": "FORBIDDEN", "description": "Authenticated user is not the profile owner." }
+        ]
+      }
+    }
+  ],
+  "types": {
+    "UserProfile": {
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "format": "uuid" },
+        "name": { "type": "string" },
+        "bio": { "type": "string" },
+        "avatar_url": { "type": "string", "format": "uri" },
+        "created_at": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "name", "created_at"]
+    }
+  },
+  "frontend_guidance": {
+    "loading_states": [
+      "Skeleton while GET /users/:userId/profile loads on page mount",
+      "Submit button disabled and showing spinner while PATCH is in-flight",
+      "Avatar preview shown immediately after file selection; upload indicator while POST is in-flight"
+    ],
+    "optimistic_update": false,
+    "gotchas": [
+      "The avatar endpoint accepts multipart/form-data — do NOT send JSON.",
+      "bio field is optional in the PATCH body — send only fields the user changed.",
+      "avatar_url may be null for users who have not uploaded an avatar yet."
+    ]
+  },
+  "be_notes": [
+    "Added name and bio columns to users table via migration 0012_add_profile_fields.sql.",
+    "Avatars stored in 'user-avatars' S3 bucket, served via CloudFront.",
+    "File size validation happens at middleware layer before the controller."
+  ]
+}

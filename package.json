@@ -1,0 +1,83 @@
+{
+  "name": "@ai-tandem/cli",
+  "version": "0.1.0",
+  "description": "Multi-repo agent orchestrator. Backend builds first, writes a typed contract, frontend builds on top. Zero human interaction until a ticket is done.",
+  "author": "Santosh Gopal <https://github.com/santoshgopal>",
+  "license": "MIT",
+  "type": "module",
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "bin": {
+    "tandem": "./dist/cli/index.js"
+  },
+  "main": "./dist/orchestrator/index.js",
+  "types": "./dist/orchestrator/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/orchestrator/index.js",
+      "types": "./dist/orchestrator/index.d.ts"
+    },
+    "./schemas": {
+      "import": "./dist/schemas/index.js",
+      "types": "./dist/schemas/index.d.ts"
+    }
+  },
+  "files": [
+    "dist",
+    "schemas",
+    "templates",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsc --project tsconfig.build.json",
+    "dev": "tsx watch cli/index.ts",
+    "start": "node dist/cli/index.js",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "validate-schemas": "tsx scripts/validate-fixtures.ts",
+    "clean": "rm -rf dist",
+    "prepublishOnly": "npm run clean && npm run build && npm run typecheck && npm run test"
+  },
+  "dependencies": {
+    "ajv": "^8.18.0",
+    "ajv-formats": "^3.0.1",
+    "chalk": "^5.6.2",
+    "chokidar": "^5.0.0",
+    "commander": "^14.0.3",
+    "ora": "^9.3.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@vitest/coverage-v8": "^4.1.3",
+    "eslint": "^9.0.0",
+    "tsx": "^4.0.0",
+    "typescript": "^6.0.2",
+    "vitest": "^4.1.3"
+  },
+  "keywords": [
+    "ai",
+    "agents",
+    "claude",
+    "claude-code",
+    "orchestration",
+    "multi-agent",
+    "backend-first",
+    "contract-driven",
+    "saas",
+    "automation",
+    "cli",
+    "devtools"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/santoshgopal/ai-tandem.git"
+  },
+  "bugs": {
+    "url": "https://github.com/santoshgopal/ai-tandem/issues"
+  },
+  "homepage": "https://github.com/santoshgopal/ai-tandem#readme"
+}

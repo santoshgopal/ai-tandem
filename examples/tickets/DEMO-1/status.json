@@ -1,0 +1,47 @@
+{
+  "ticket_id": "DEMO-1",
+  "current": "done",
+  "transitions": [
+    {
+      "from": null,
+      "to": "queued",
+      "at": "2026-01-15T10:00:00Z"
+    },
+    {
+      "from": "queued",
+      "to": "be-working",
+      "at": "2026-01-15T11:00:00Z"
+    },
+    {
+      "from": "be-working",
+      "to": "contract-ready",
+      "at": "2026-01-15T11:30:00Z"
+    },
+    {
+      "from": "contract-ready",
+      "to": "fe-working",
+      "at": "2026-01-15T12:00:00Z"
+    },
+    {
+      "from": "fe-working",
+      "to": "done",
+      "at": "2026-01-15T12:45:00Z"
+    }
+  ],
+  "be_run": {
+    "started_at": "2026-01-15T11:00:00Z",
+    "completed_at": "2026-01-15T11:30:00Z",
+    "exit_code": 0,
+    "retry_count": 0,
+    "branch": "tandem/DEMO-1-be",
+    "commit": "a1b2c3d"
+  },
+  "fe_run": {
+    "started_at": "2026-01-15T12:00:00Z",
+    "completed_at": "2026-01-15T12:45:00Z",
+    "exit_code": 0,
+    "retry_count": 0,
+    "branch": "tandem/DEMO-1-fe",
+    "commit": "e4f5g6h"
+  }
+}

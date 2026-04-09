@@ -1,0 +1,48 @@
+This file contains a sample of what a Claude Code agent outputs during a tandem run.
+It is used by integration tests to verify that the orchestrator correctly parses
+agent output and detects completion signals.
+
+--- SAMPLE OUTPUT START ---
+
+Reading ticket PROJ-1...
+Ticket: Add user profile endpoint and profile page
+
+Understanding existing codebase structure...
+- Found UserModel at src/models/user.ts
+- Found AuthMiddleware at src/middleware/auth.ts
+- Found StorageService at src/services/storage.ts
+- Found existing API envelope pattern at src/types/api.ts
+
+Planning implementation:
+1. Add name and bio columns to users table (migration required)
+2. Implement GET /users/:userId/profile
+3. Implement PATCH /users/:userId/profile
+4. Implement POST /users/:userId/avatar (multipart)
+5. Write unit tests
+6. Write contract.json
+
+Creating migration: migrations/0012_add_profile_fields.sql
+Creating: src/controllers/profile.controller.ts
+Creating: src/routes/profile.routes.ts
+Updating: src/routes/index.ts (registering new routes)
+Creating: src/tests/profile.controller.test.ts
+
+Running tests...
+✓ GET /users/:userId/profile returns 200 with profile data
+✓ GET /users/:userId/profile returns 404 for unknown user
+✓ PATCH /users/:userId/profile updates name and bio
+✓ PATCH /users/:userId/profile returns 403 for wrong user
+✓ POST /users/:userId/avatar stores file and returns URL
+✓ POST /users/:userId/avatar rejects files over 2MB
+✓ POST /users/:userId/avatar rejects non-image files
+
+All tests passing. Committing...
+
+[tandem/PROJ-1-be a1b2c3d] feat(PROJ-1): add user profile endpoints
+
+Writing contract.json to tickets/PROJ-1/contract.json...
+Contract written successfully.
+
+Backend agent complete.
+
+--- SAMPLE OUTPUT END ---

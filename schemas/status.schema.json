@@ -1,0 +1,93 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/santoshgopal/ai-tandem/schemas/status.schema.json",
+  "title": "Tandem Ticket Status",
+  "description": "Written and managed exclusively by the tandem orchestrator. Stored as status.json inside each ticket directory. Records the current state machine position, all transitions with timestamps, and agent run metadata. Never edit manually.",
+  "type": "object",
+  "required": ["ticket_id", "current", "transitions"],
+  "additionalProperties": false,
+  "properties": {
+
+    "ticket_id": {
+      "type": "string",
+      "pattern": "^[A-Z]+-[0-9]+$",
+      "description": "Ticket ID this status record belongs to."
+    },
+
+    "current": {
+      "type": "string",
+      "enum": ["queued", "be-working", "contract-ready", "fe-working", "done", "error", "blocked"],
+      "description": "The current state of this ticket. Reflects the last successful transition."
+    },
+
+    "transitions": {
+      "type": "array",
+      "description": "Append-only log of every state transition. One object per transition. Never modified once written.",
+      "items": {
+        "type": "object",
+        "required": ["from", "to", "at"],
+        "additionalProperties": false,
+        "properties": {
+          "from": {
+            "type": ["string", "null"],
+            "enum": ["queued", "be-working", "contract-ready", "fe-working", "done", "error", "blocked", null],
+            "description": "Previous state. null for the initial queued transition."
+          },
+          "to": {
+            "type": "string",
+            "enum": ["queued", "be-working", "contract-ready", "fe-working", "done", "error", "blocked"],
+            "description": "New state after this transition."
+          },
+          "at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "ISO 8601 UTC timestamp when this transition occurred."
+          },
+          "reason": {
+            "type": "string",
+            "description": "Optional. Human-readable reason for this transition. Written by orchestrator on error or block transitions. Example: 'Agent exited with code 1 after 2 retries. Last error: contract.json not written within timeout'."
+          }
+        }
+      }
+    },
+
+    "be_run": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Metadata from the most recent backend agent run.",
+      "properties": {
+        "started_at": { "type": "string", "format": "date-time" },
+        "completed_at": { "type": ["string", "null"], "format": "date-time" },
+        "exit_code": { "type": ["integer", "null"] },
+        "retry_count": { "type": "integer", "minimum": 0 },
+        "branch": { "type": "string", "description": "Git branch the backend agent worked on." },
+        "commit": { "type": ["string", "null"], "description": "Git SHA of the backend agent's final commit." }
+      }
+    },
+
+    "fe_run": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Metadata from the most recent frontend agent run.",
+      "properties": {
+        "started_at": { "type": "string", "format": "date-time" },
+        "completed_at": { "type": ["string", "null"], "format": "date-time" },
+        "exit_code": { "type": ["integer", "null"] },
+        "retry_count": { "type": "integer", "minimum": 0 },
+        "branch": { "type": "string", "description": "Git branch the frontend agent worked on." },
+        "commit": { "type": ["string", "null"], "description": "Git SHA of the frontend agent's final commit." }
+      }
+    },
+
+    "pr_urls": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Pull request URLs opened by tandem after ticket completion. Populated when open_prs is true in config.",
+      "properties": {
+        "be_pr_url": { "type": "string", "format": "uri" },
+        "fe_pr_url": { "type": "string", "format": "uri" }
+      }
+    }
+
+  }
+}

@@ -1,0 +1,142 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/santoshgopal/ai-tandem/schemas/ticket.schema.json",
+  "title": "Tandem Ticket",
+  "description": "A single unit of work for the tandem orchestrator. One ticket = one feature, implemented backend-first then frontend.",
+  "type": "object",
+  "required": [
+    "id",
+    "title",
+    "status",
+    "priority",
+    "user_story",
+    "acceptance",
+    "be_scope",
+    "fe_scope"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^[A-Z]+-[0-9]+$",
+      "description": "Unique ticket identifier. Format: PREFIX-NUMBER. Example: PROJ-42. Set the prefix during tandem init."
+    },
+
+    "title": {
+      "type": "string",
+      "minLength": 5,
+      "maxLength": 120,
+      "description": "Short imperative title. Used as git branch suffix and PR title. Example: 'Add user profile endpoint'."
+    },
+
+    "status": {
+      "type": "string",
+      "enum": [
+        "queued",
+        "be-working",
+        "contract-ready",
+        "fe-working",
+        "done",
+        "error",
+        "blocked"
+      ],
+      "description": "Current state machine position. Managed by the orchestrator. Do not set manually except to 'queued' or 'blocked'. Transitions: queued → be-working → contract-ready → fe-working → done. Error and blocked are side states."
+    },
+
+    "priority": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Execution order. Lower number = executed first. Tickets with the same priority are executed in the order they appear on disk. Start at 1, increment by 10 to leave room for insertions."
+    },
+
+    "depends_on": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^[A-Z]+-[0-9]+$"
+      },
+      "uniqueItems": true,
+      "default": [],
+      "description": "List of ticket IDs that must reach 'done' status before this ticket can start. The orchestrator sets this ticket to 'blocked' if any dependency is not yet done. Circular dependencies are a validation error."
+    },
+
+    "user_story": {
+      "type": "string",
+      "minLength": 10,
+      "description": "Written as: 'As a [user type], I want [goal] so that [reason]'. Both agents receive this. It anchors all implementation decisions to the actual user need."
+    },
+
+    "acceptance": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 5 },
+      "minItems": 1,
+      "description": "Explicit done criteria. Each item is a testable statement. Both agents use these to confirm their work is complete before writing output. Example: ['User can submit the form without page reload', 'API returns 400 if email is missing']."
+    },
+
+    "be_scope": {
+      "type": "string",
+      "minLength": 10,
+      "description": "Plain English description of what the backend agent must build. Be specific about: which endpoints, which DB tables/models, which business logic. The agent treats this as its primary task definition. Do NOT describe frontend work here."
+    },
+
+    "be_constraints": {
+      "type": "array",
+      "items": { "type": "string" },
+      "default": [],
+      "description": "Hard rules the backend agent must follow. Examples: 'Use existing AuthMiddleware from src/middleware/auth.ts', 'Endpoints must return { data, error } envelope', 'Postgres only, no new tables without migration'. These override agent judgment."
+    },
+
+    "be_hints": {
+      "type": "array",
+      "items": { "type": "string" },
+      "default": [],
+      "description": "Soft guidance for the backend agent. Examples: 'UserService in src/services/user.ts already handles password hashing', 'See PROJ-38 contract.json for pagination pattern we use'. Helps the agent avoid duplicating work."
+    },
+
+    "fe_scope": {
+      "type": "string",
+      "minLength": 10,
+      "description": "Plain English description of what the frontend agent must build. Be specific about: which views, which components, which interactions. The agent treats this as its primary task definition. Do NOT describe backend work here."
+    },
+
+    "fe_constraints": {
+      "type": "array",
+      "items": { "type": "string" },
+      "default": [],
+      "description": "Hard rules the frontend agent must follow. Examples: 'Use existing Button component from src/components/ui/Button', 'All forms must use react-hook-form', 'No inline styles, Tailwind only'. These override agent judgment."
+    },
+
+    "fe_hints": {
+      "type": "array",
+      "items": { "type": "string" },
+      "default": [],
+      "description": "Soft guidance for the frontend agent. Examples: 'ProfileCard component in src/components/ProfileCard.tsx is a good reference', 'Loading states should use the Skeleton component'. Helps the agent avoid reinventing patterns."
+    },
+
+    "meta": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Optional metadata. Not used by the orchestrator engine — for human reference only.",
+      "properties": {
+        "created_at": {
+          "type": "string",
+          "format": "date-time",
+          "description": "ISO 8601 timestamp when this ticket was created."
+        },
+        "created_by": {
+          "type": "string",
+          "description": "Who created this ticket. Free text."
+        },
+        "labels": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Free-form tags. Examples: 'auth', 'billing', 'v2'. Not used for ordering."
+        },
+        "notes": {
+          "type": "string",
+          "description": "Free-form notes visible to humans. Not injected into agent prompts."
+        }
+      }
+    }
+  }
+}

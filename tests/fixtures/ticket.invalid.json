@@ -1,0 +1,12 @@
+{
+  "_comment": "This file is intentionally invalid. Used by schema tests to verify validation rejects bad input.",
+  "id": "proj-1",
+  "title": "hi",
+  "status": "in-progress",
+  "priority": 0,
+  "user_story": "short",
+  "acceptance": [],
+  "be_scope": "short",
+  "fe_scope": "short",
+  "extra_field": "not allowed"
+}

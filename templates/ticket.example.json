@@ -1,0 +1,71 @@
+{
+  "_comment": "This is an example ticket. Copy this file and fill in your values. Remove all _comment keys before saving.",
+  "id": "PROJ-1",
+  "_comment_id": "Format: UPPERCASE_PREFIX-NUMBER. Set your prefix in tandem init.",
+
+  "title": "Add user profile endpoint and profile page",
+  "_comment_title": "Short, imperative. Used as the PR title and branch name suffix.",
+
+  "status": "queued",
+  "_comment_status": "Always start as 'queued'. The orchestrator manages all other statuses.",
+
+  "priority": 10,
+  "_comment_priority": "Lower = runs first. Use multiples of 10 so you can insert tickets between.",
+
+  "depends_on": [],
+  "_comment_depends_on": "List ticket IDs that must be 'done' before this ticket starts. Empty array = no dependencies.",
+
+  "user_story": "As a registered user, I want to view and edit my profile information so that other users can identify me.",
+
+  "acceptance": [
+    "User can view their own profile with name, bio, and avatar",
+    "User can update their name and bio via a form",
+    "Avatar upload accepts JPEG and PNG up to 2MB",
+    "Changes persist after page refresh",
+    "Profile page shows a 404 state for non-existent user IDs"
+  ],
+  "_comment_acceptance": "Each item must be testable. Both agents use this list to confirm they're done.",
+
+  "be_scope": "Create a GET /users/:userId/profile endpoint that returns the user's public profile. Create a PATCH /users/:userId/profile endpoint for authenticated users to update their own name and bio. Create a POST /users/:userId/avatar endpoint that accepts multipart/form-data with an image file, stores it, and returns the public URL. All three endpoints should use the existing AuthMiddleware.",
+  "_comment_be_scope": "Be specific. Name the HTTP methods, paths, and any business rules. Do not mention UI here.",
+
+  "be_constraints": [
+    "Use AuthMiddleware from src/middleware/auth.ts for authenticated endpoints",
+    "Return { data, error } envelope on all responses — see src/types/api.ts",
+    "Store avatars using the existing StorageService in src/services/storage.ts",
+    "Postgres only — no new tables without a migration file"
+  ],
+  "_comment_be_constraints": "Hard rules the agent must not deviate from. Be specific about file paths.",
+
+  "be_hints": [
+    "UserModel is in src/models/user.ts — profile fields may need to be added",
+    "See PROJ-38 for how we handle file uploads — same pattern applies here",
+    "The validation middleware is in src/middleware/validate.ts"
+  ],
+  "_comment_be_hints": "Pointers to existing code. Saves the agent from reinventing patterns.",
+
+  "fe_scope": "Create a /profile/:userId page that displays the user's profile card with name, bio, and avatar. Add an edit mode (toggle button) that shows a form to update name and bio inline. Add an avatar upload button on the profile page. Use the existing Page layout component.",
+  "_comment_fe_scope": "Be specific about which views and interactions. Do not mention API endpoints — the contract handles that.",
+
+  "fe_constraints": [
+    "Use the existing Page component from src/components/layouts/Page.tsx",
+    "Use react-hook-form for all forms",
+    "Tailwind only — no inline styles",
+    "Avatar upload must show a preview before confirming"
+  ],
+  "_comment_fe_constraints": "Hard rules the frontend agent must follow.",
+
+  "fe_hints": [
+    "UserCard component in src/components/UserCard.tsx is a good reference for the profile display",
+    "Loading states should use the existing Skeleton component from src/components/ui/Skeleton.tsx",
+    "See /settings page for an example of inline edit mode pattern"
+  ],
+  "_comment_fe_hints": "Pointers to existing patterns. Helps the agent avoid reinventing.",
+
+  "meta": {
+    "created_at": "2026-01-15T10:00:00Z",
+    "created_by": "Santosh Gopal",
+    "labels": ["profile", "v1"],
+    "notes": "This is the first ticket in the user profile epic. PROJ-2 will add social links."
+  }
+}

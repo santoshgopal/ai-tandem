@@ -1,0 +1,37 @@
+{
+  "id": "PROJ-1",
+  "title": "Add user profile endpoint and profile page",
+  "status": "queued",
+  "priority": 10,
+  "depends_on": [],
+  "user_story": "As a registered user, I want to view and edit my profile information so that other users can identify me.",
+  "acceptance": [
+    "User can view their own profile with name, bio, and avatar",
+    "User can update their name and bio via a form",
+    "Avatar upload accepts JPEG and PNG up to 2MB",
+    "Changes persist after page refresh",
+    "Profile page shows a 404 state for non-existent user IDs"
+  ],
+  "be_scope": "Create GET /users/:userId/profile, PATCH /users/:userId/profile, and POST /users/:userId/avatar endpoints using existing AuthMiddleware.",
+  "be_constraints": [
+    "Use AuthMiddleware from src/middleware/auth.ts",
+    "Return { data, error } envelope on all responses"
+  ],
+  "be_hints": [
+    "UserModel is in src/models/user.ts"
+  ],
+  "fe_scope": "Create a /profile/:userId page with a profile card, inline edit form, and avatar upload button using the existing Page layout component.",
+  "fe_constraints": [
+    "Use the existing Page component from src/components/layouts/Page.tsx",
+    "Use react-hook-form for all forms",
+    "Tailwind only — no inline styles"
+  ],
+  "fe_hints": [
+    "UserCard component in src/components/UserCard.tsx is a good reference"
+  ],
+  "meta": {
+    "created_at": "2026-01-15T10:00:00Z",
+    "created_by": "test",
+    "labels": ["profile", "v1"]
+  }
+}

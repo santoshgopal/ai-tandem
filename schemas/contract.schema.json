@@ -1,0 +1,275 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/santoshgopal/ai-tandem/schemas/contract.schema.json",
+  "title": "Tandem Contract",
+  "description": "Written by the backend agent after implementation. Read by the frontend agent. Describes the actual API surface that was built — not what was planned. Every field must reflect reality.",
+  "type": "object",
+  "required": ["ticket_id", "be_commit", "generated_at", "endpoints", "types"],
+  "additionalProperties": false,
+  "properties": {
+
+    "ticket_id": {
+      "type": "string",
+      "pattern": "^[A-Z]+-[0-9]+$",
+      "description": "The ticket ID this contract belongs to. Must match the ticket that triggered the backend agent run."
+    },
+
+    "be_commit": {
+      "type": "string",
+      "minLength": 7,
+      "description": "Full or short git SHA of the backend commit that implements this feature. The frontend agent uses this to verify it is building against the right backend version."
+    },
+
+    "generated_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 timestamp when the backend agent wrote this contract."
+    },
+
+    "base_url_hint": {
+      "type": "string",
+      "description": "Optional. The path prefix for all endpoints in this contract. Example: '/api/v1/users'. Frontend agent uses this when constructing API calls.",
+      "default": "/api"
+    },
+
+    "auth": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Authentication scheme used by all endpoints in this contract, unless an endpoint overrides it.",
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["bearer", "api-key", "session-cookie", "none"],
+          "description": "The auth mechanism. 'bearer' = Authorization: Bearer <token>. 'api-key' = custom header. 'session-cookie' = HttpOnly cookie. 'none' = public endpoint."
+        },
+        "header": {
+          "type": "string",
+          "description": "For api-key auth: the header name. Example: 'X-API-Key'."
+        },
+        "notes": {
+          "type": "string",
+          "description": "Any notes the backend agent wants the frontend to know about auth. Example: 'Token expires in 1 hour. Refresh via POST /auth/refresh'."
+        }
+      }
+    },
+
+    "endpoints": {
+      "type": "array",
+      "minItems": 1,
+      "description": "Every HTTP endpoint this feature introduces. One object per endpoint.",
+      "items": {
+        "type": "object",
+        "required": ["method", "path", "summary", "response"],
+        "additionalProperties": false,
+        "properties": {
+
+          "method": {
+            "type": "string",
+            "enum": ["GET", "POST", "PUT", "PATCH", "DELETE"],
+            "description": "HTTP method."
+          },
+
+          "path": {
+            "type": "string",
+            "description": "Path relative to base_url_hint. Path params in :colon notation. Example: '/users/:userId/profile'."
+          },
+
+          "summary": {
+            "type": "string",
+            "description": "One sentence. What this endpoint does. Example: 'Returns the authenticated user's profile including avatar and bio'."
+          },
+
+          "auth_override": {
+            "type": "string",
+            "enum": ["bearer", "api-key", "session-cookie", "none"],
+            "description": "If this endpoint uses a different auth scheme from the contract-level auth, set it here."
+          },
+
+          "request": {
+            "type": "object",
+            "additionalProperties": false,
+            "description": "The shape of the incoming request. All optional — only include what this endpoint actually accepts.",
+            "properties": {
+              "params": {
+                "type": "object",
+                "description": "URL path parameters as key → TypeDef. Example: { \"userId\": { \"type\": \"string\", \"format\": \"uuid\" } }",
+                "additionalProperties": {
+                  "$ref": "#/$defs/TypeDef"
+                }
+              },
+              "query": {
+                "type": "object",
+                "description": "Query string parameters as key → TypeDef.",
+                "additionalProperties": {
+                  "$ref": "#/$defs/TypeDef"
+                }
+              },
+              "body": {
+                "$ref": "#/$defs/TypeDef",
+                "description": "Request body shape. Use $ref to a named type in the types map when the body is a known model."
+              },
+              "headers": {
+                "type": "object",
+                "description": "Non-auth headers the frontend must send. Key is header name.",
+                "additionalProperties": { "type": "string" }
+              }
+            }
+          },
+
+          "response": {
+            "type": "object",
+            "required": ["success"],
+            "additionalProperties": false,
+            "description": "All possible response shapes from this endpoint.",
+            "properties": {
+              "success": {
+                "type": "object",
+                "required": ["status", "body"],
+                "additionalProperties": false,
+                "properties": {
+                  "status": {
+                    "type": "integer",
+                    "description": "HTTP status code on success. Usually 200 or 201."
+                  },
+                  "body": {
+                    "$ref": "#/$defs/TypeDef",
+                    "description": "The response body shape on success."
+                  }
+                }
+              },
+              "errors": {
+                "type": "array",
+                "description": "All error responses this endpoint can return. Include every status code the frontend must handle.",
+                "items": {
+                  "type": "object",
+                  "required": ["status", "code", "description"],
+                  "additionalProperties": false,
+                  "properties": {
+                    "status": {
+                      "type": "integer",
+                      "description": "HTTP status code. Example: 400, 401, 403, 404, 409, 422, 500."
+                    },
+                    "code": {
+                      "type": "string",
+                      "description": "Machine-readable error code. Example: 'EMAIL_ALREADY_EXISTS', 'TOKEN_EXPIRED'. The frontend uses this to show the correct message."
+                    },
+                    "description": {
+                      "type": "string",
+                      "description": "Human-readable explanation of when this error fires."
+                    }
+                  }
+                }
+              }
+            }
+          }
+
+        }
+      }
+    },
+
+    "types": {
+      "type": "object",
+      "description": "Named TypeScript interfaces shared by request and response bodies. Keys are PascalCase type names. Values are TypeDef objects. The frontend agent uses these to write typed API calls and components.",
+      "additionalProperties": {
+        "$ref": "#/$defs/TypeDef"
+      }
+    },
+
+    "frontend_guidance": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Structured guidance the backend agent writes specifically for the frontend agent. Derived from what was actually built.",
+      "properties": {
+        "loading_states": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Async states the frontend must handle. Example: ['Submit button loading while POST /users/profile is in-flight', 'Skeleton while initial GET /users/:id loads']."
+        },
+        "optimistic_update": {
+          "type": "boolean",
+          "description": "Whether the frontend should optimistically update UI before the server responds. True only if the backend guarantees the operation is idempotent or can be rolled back."
+        },
+        "pagination": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "Pagination details if any endpoint returns a list.",
+          "properties": {
+            "strategy": {
+              "type": "string",
+              "enum": ["cursor", "offset", "none"],
+              "description": "'cursor' = next_cursor token. 'offset' = page + per_page. 'none' = no pagination."
+            },
+            "default_page_size": {
+              "type": "integer",
+              "description": "Default number of items returned per page."
+            },
+            "max_page_size": {
+              "type": "integer",
+              "description": "Maximum allowed page size."
+            }
+          }
+        },
+        "polling_required": {
+          "type": "boolean",
+          "description": "If true, the backend operation is async. Frontend must poll a status endpoint or connect to a WebSocket."
+        },
+        "gotchas": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Anything the backend agent discovered during implementation that the frontend must know. Examples: 'The profile image upload endpoint accepts multipart/form-data, not JSON', 'Rate limit is 10 requests per second on search endpoint', 'Password field is write-only — never returned in responses'."
+        }
+      }
+    },
+
+    "be_notes": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Free-form notes from the backend agent. Implementation decisions, trade-offs made, things left for follow-up tickets. Not structured — just whatever the agent wants to document."
+    }
+
+  },
+
+  "$defs": {
+    "TypeDef": {
+      "description": "A reusable inline type definition. Supports primitives, objects, arrays, unions, and $ref references to named types in the types map.",
+      "oneOf": [
+        {
+          "type": "object",
+          "required": ["type"],
+          "properties": {
+            "type": { "type": "string", "enum": ["string", "number", "integer", "boolean", "null"] },
+            "format": { "type": "string", "description": "Optional. JSON Schema format. Examples: uuid, date-time, email, uri." },
+            "enum": { "type": "array", "description": "If set, value must be one of these." },
+            "description": { "type": "string" }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["type", "properties"],
+          "properties": {
+            "type": { "type": "string", "enum": ["object"] },
+            "properties": { "type": "object", "additionalProperties": { "$ref": "#/$defs/TypeDef" } },
+            "required": { "type": "array", "items": { "type": "string" } },
+            "description": { "type": "string" }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["type", "items"],
+          "properties": {
+            "type": { "type": "string", "enum": ["array"] },
+            "items": { "$ref": "#/$defs/TypeDef" },
+            "description": { "type": "string" }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["$ref"],
+          "properties": {
+            "$ref": { "type": "string", "description": "Reference to a named type in the contract's types map. Example: 'UserProfile'." }
+          }
+        }
+      ]
+    }
+  }
+}
