@@ -26,6 +26,7 @@
     "orchestrator/**/*",
     "git/**/*",
     "schemas/**/*.ts",
+    "types/**/*",
     "scripts/**/*",
     "tests/**/*"
   ],

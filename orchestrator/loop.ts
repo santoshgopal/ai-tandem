@@ -31,6 +31,7 @@ import {
   ContractValidationError,
 } from './errors.js';
 import type { TandemConfig } from '../schemas/index.js';
+import type { Logger } from '../types/logger.interface.js';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -39,6 +40,7 @@ export interface LoopOptions {
   ticketsDir: string;
   dryRun: boolean;
   signal?: AbortSignal;
+  logger?: Logger;
 }
 
 export interface LoopResult {
@@ -67,16 +69,35 @@ async function pauseFileExists(ticketsDir: string): Promise<boolean> {
   }
 }
 
-function log(msg: string, dryRun: boolean): void {
-  const prefix = dryRun ? '[DRY RUN] ' : '';
-  console.log(`${prefix}${msg}`);
-}
+/** Fallback console-based logger used when no logger is injected. */
+const consoleFallback: Logger = {
+  info: (msg: string) => console.log(msg),
+  success: (msg: string) => console.log(msg),
+  warn: (msg: string) => console.warn(msg),
+  error: (msg: string) => console.error(msg),
+  agent: (_role: 'be' | 'fe', msg: string) => console.log(msg),
+  phase: (msg: string) => console.log(`\n${msg}\n`),
+  dryRun: (msg: string) => console.log(`[DRY RUN] ${msg}`),
+  blank: () => console.log(''),
+  table: (_h: string[], r: string[][]) => console.table(r),
+  isTTY: process.stdout.isTTY ?? false,
+};
 
 // ─── Main loop ────────────────────────────────────────────────────────────────
 
 export async function runLoop(options: LoopOptions): Promise<LoopResult> {
   const { config, ticketsDir, dryRun, signal } = options;
+  const out: Logger = options.logger ?? consoleFallback;
   const result: LoopResult = { processed: 0, skipped: 0, failed: 0 };
+
+  /** Emit an informational message, using dryRun prefix when appropriate. */
+  const emit = (msg: string): void => {
+    if (dryRun) {
+      out.dryRun(msg);
+    } else {
+      out.info(msg);
+    }
+  };
 
   const maxRetries = config.max_retries ?? 2;
   const agentTimeout = config.agent_timeout_minutes ?? 30;
@@ -94,7 +115,7 @@ export async function runLoop(options: LoopOptions): Promise<LoopResult> {
       err instanceof ValidationError ||
       err instanceof CircularDependencyError
     ) {
-      console.error(`[tandem] Fatal error loading tickets: ${err.message}`);
+      out.error(`[tandem] Fatal error loading tickets: ${err.message}`);
       throw err;
     }
     throw err;
@@ -103,13 +124,12 @@ export async function runLoop(options: LoopOptions): Promise<LoopResult> {
   const totalSkipped = queue.done.length + queue.blocked.length + queue.errored.length;
   result.skipped = totalSkipped;
 
-  log(
+  emit(
     `Queue: ${queue.executable.length} executable, ${queue.blocked.length} blocked, ${queue.done.length} done, ${queue.errored.length} errored`,
-    dryRun,
   );
 
   if (queue.executable.length === 0) {
-    log('Queue empty. Nothing to run.', dryRun);
+    emit('Queue empty. Nothing to run.');
     return result;
   }
 
@@ -121,26 +141,26 @@ export async function runLoop(options: LoopOptions): Promise<LoopResult> {
     // Check abort signal
     if (signal?.aborted) {
       result.stoppedAt = ticket.id;
-      log(`Aborted before processing ${ticket.id}.`, dryRun);
+      emit(`Aborted before processing ${ticket.id}.`);
       return result;
     }
 
     // Check PAUSE file
     if (await pauseFileExists(ticketsDir)) {
       result.stoppedAt = ticket.id;
-      log('Paused. Run tandem resume to continue.', dryRun);
+      emit('Paused. Run tandem resume to continue.');
       return result;
     }
 
     // Check loop_until — stop BEFORE processing if not the first ticket
     if (!firstTicket && config.loop_until === ticket.id) {
       result.stoppedAt = ticket.id;
-      log(`loop_until target '${ticket.id}' reached before processing. Stopping.`, dryRun);
+      emit(`loop_until target '${ticket.id}' reached before processing. Stopping.`);
       return result;
     }
     firstTicket = false;
 
-    log(`▶ Starting ticket ${ticket.id}: ${ticket.title}`, dryRun);
+    out.phase(`▶ Starting ticket ${ticket.id}: ${ticket.title}`);
 
     const sm = new TicketStateMachine(statusPath, ticket.id);
 
@@ -157,7 +177,7 @@ export async function runLoop(options: LoopOptions): Promise<LoopResult> {
         commit: null,
       });
     } else {
-      log(`Would transition ${ticket.id} → be-working`, dryRun);
+      out.dryRun(`Would transition ${ticket.id} → be-working`);
     }
 
     const bePrompt = buildBackendPrompt(ticket, contractPath, contractSchemaPath());
@@ -187,21 +207,18 @@ export async function runLoop(options: LoopOptions): Promise<LoopResult> {
         }
         result.failed++;
         if (pauseOnError) {
-          log(
-            `Paused on error for ticket ${ticket.id}: ${err.message}`,
-            dryRun,
-          );
+          emit(`Paused on error for ticket ${ticket.id}: ${err.message}`);
           result.stoppedAt = ticket.id;
           return result;
         }
-        log(`Skipping errored ticket ${ticket.id}: ${err.message}`, dryRun);
+        emit(`Skipping errored ticket ${ticket.id}: ${err.message}`);
         continue;
       }
       if (
         err instanceof InvalidTransitionError ||
         err instanceof StateWriteError
       ) {
-        console.error(`[tandem] Fatal error: ${err.message}`);
+        out.error(`[tandem] Fatal error: ${err.message}`);
         throw err;
       }
       throw err;
@@ -230,7 +247,7 @@ export async function runLoop(options: LoopOptions): Promise<LoopResult> {
       await sm.transition('contract-ready');
     }
 
-    log(`⏳ Waiting for contract.json at ${contractPath}...`, dryRun);
+    emit(`⏳ Waiting for contract.json at ${contractPath}...`);
 
     let contract;
     if (!dryRun) {
@@ -244,19 +261,18 @@ export async function runLoop(options: LoopOptions): Promise<LoopResult> {
           await sm.transition('error', { reason: err.message });
           result.failed++;
           if (pauseOnError) {
-            log(`Paused on error for ticket ${ticket.id}: ${err.message}`, dryRun);
+            emit(`Paused on error for ticket ${ticket.id}: ${err.message}`);
             result.stoppedAt = ticket.id;
             return result;
           }
-          log(`Skipping errored ticket ${ticket.id}: ${err.message}`, dryRun);
+          emit(`Skipping errored ticket ${ticket.id}: ${err.message}`);
           continue;
         }
         throw err;
       }
     } else {
-      log(
+      out.dryRun(
         `Would wait for contract.json at ${contractPath} (timeout: ${contractTimeout}m)`,
-        dryRun,
       );
       // In dry-run mode, build a minimal contract from the example for prompt building
       contract = null;
@@ -264,7 +280,7 @@ export async function runLoop(options: LoopOptions): Promise<LoopResult> {
 
     // ── FRONTEND PHASE ────────────────────────────────────────────────────────
 
-    log(`▶ Starting frontend agent for ${ticket.id}`, dryRun);
+    out.phase(`▶ Starting frontend agent for ${ticket.id}`);
 
     if (!dryRun) {
       await sm.updateRunMeta('fe', {
@@ -308,18 +324,18 @@ export async function runLoop(options: LoopOptions): Promise<LoopResult> {
         }
         result.failed++;
         if (pauseOnError) {
-          log(`Paused on error for ticket ${ticket.id}: ${err.message}`, dryRun);
+          emit(`Paused on error for ticket ${ticket.id}: ${err.message}`);
           result.stoppedAt = ticket.id;
           return result;
         }
-        log(`Skipping errored ticket ${ticket.id}: ${err.message}`, dryRun);
+        emit(`Skipping errored ticket ${ticket.id}: ${err.message}`);
         continue;
       }
       if (
         err instanceof InvalidTransitionError ||
         err instanceof StateWriteError
       ) {
-        console.error(`[tandem] Fatal error: ${err.message}`);
+        out.error(`[tandem] Fatal error: ${err.message}`);
         throw err;
       }
       throw err;
@@ -344,24 +360,23 @@ export async function runLoop(options: LoopOptions): Promise<LoopResult> {
       await sm.transition('done');
     }
 
-    log(`✓ Ticket ${ticket.id} complete.`, dryRun);
+    out.phase(`✓ Ticket ${ticket.id} complete.`);
     result.processed++;
 
     // LOOP CONTROL
     if (!config.loop) {
-      log('Single-run mode. Stopping after first ticket.', dryRun);
+      emit('Single-run mode. Stopping after first ticket.');
       return result;
     }
 
     if (config.loop_until === ticket.id) {
-      log(`Reached loop_until target '${ticket.id}'. Stopping.`, dryRun);
+      emit(`Reached loop_until target '${ticket.id}'. Stopping.`);
       return result;
     }
   }
 
-  log(
+  emit(
     `Loop complete. Processed: ${result.processed}, Failed: ${result.failed}, Skipped: ${result.skipped}`,
-    dryRun,
   );
   return result;
 }

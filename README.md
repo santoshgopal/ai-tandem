@@ -2,7 +2,7 @@
 
 > Multi-repo agent orchestrator. Backend builds first, writes a typed contract, frontend builds on top. Zero human interaction until a ticket is done.
 
-**Status:** Phase 1 complete — orchestrator engine fully implemented and tested (73 tests, 0 errors).
+**Status:** Phase 2 complete — CLI fully implemented and buildable (100 tests, 0 errors).
 
 ---
 
@@ -66,26 +66,39 @@ tandem run
 
 ---
 
-## Quick start
+## Try it
 
 ```bash
-# Install
+# Install globally
 npm install -g @ai-tandem/cli
 
-# Initialise a project
-tandem init
+# Or run from source
+git clone https://github.com/santoshgopal/ai-tandem
+cd ai-tandem
+npm install
+npm run build
 
-# Create a new ticket
-tandem new-ticket
+# Set up a new project (interactive)
+node dist/cli/index.js init
 
 # Validate tickets and config
-tandem validate
+node dist/cli/index.js validate
 
-# Run the next queued ticket
-tandem run
+# Dry run — validate prompts without invoking claude
+node dist/cli/index.js run --dry-run
 
-# Check status of all tickets
-tandem status
+# Full run (requires claude CLI installed and authenticated)
+node dist/cli/index.js run
+
+# Show ticket status table
+node dist/cli/index.js status
+
+# Scaffold a new ticket
+node dist/cli/index.js new-ticket
+
+# Pause / resume the loop
+node dist/cli/index.js pause
+node dist/cli/index.js resume
 ```
 
 ---

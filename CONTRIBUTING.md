@@ -38,6 +38,7 @@ Body (optional): explain why, not what.
 Types: `feat`, `fix`, `docs`, `test`, `refactor`, `chore`
 
 Examples:
+
 - `feat(orchestrator): add retry-handler with exponential backoff`
 - `fix(contract-watcher): handle symlinked contract paths`
 - `docs(schemas): clarify TypeDef $ref semantics`
@@ -45,6 +46,7 @@ Examples:
 ## Schema changes
 
 Changes to any `.schema.json` file must:
+
 1. Be backwards-compatible OR bump the `$id` version
 2. Update the corresponding TypeScript interfaces in `schemas/index.ts`
 3. Update affected fixture files in `tests/fixtures/`
