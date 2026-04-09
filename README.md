@@ -2,6 +2,8 @@
 
 > Multi-repo agent orchestrator. Backend builds first, writes a typed contract, frontend builds on top. Zero human interaction until a ticket is done.
 
+**Status:** Phase 1 complete — orchestrator engine fully implemented and tested (73 tests, 0 errors).
+
 ---
 
 ## What is this?
@@ -50,13 +52,17 @@ tandem run
 
 ### 3. Tandem drives both agents
 
-1. Reads the highest-priority `queued` ticket
-2. Launches Claude Code headless in the backend repo with a structured prompt
-3. Backend agent implements the feature, commits, and writes `contract.json`
-4. Tandem detects `contract.json` and launches the frontend agent
-5. Frontend agent reads the contract, implements the UI, commits
-6. Ticket status set to `done`
-7. (Optional) PRs opened in both repos
+1. `ticket-loader` reads the highest-priority `queued` ticket, resolves dependencies
+2. `loop` transitions the ticket to `be-working` via `state-machine`
+3. `prompt-builder` renders the backend prompt from templates
+4. `agent-runner` launches Claude Code headless in the backend repo; `retry-handler` wraps with retries
+5. Backend agent implements the feature, commits, and writes `contract.json`
+6. `contract-watcher` detects `contract.json`, validates it against the schema
+7. `loop` transitions to `fe-working`; `prompt-builder` renders the frontend prompt
+8. `agent-runner` launches Claude Code in the frontend repo
+9. Frontend agent reads the contract, implements the UI, commits
+10. `audit-writer` parses agent output → `be_audit.md` / `fe_audit.md`
+11. Ticket status set to `done`
 
 ---
 
