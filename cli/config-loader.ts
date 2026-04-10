@@ -64,9 +64,16 @@ async function readAndValidate(configPath: string): Promise<ResolvedConfig> {
 
   validateConfig(parsed); // throws ValidationError if invalid
   const config = parsed as TandemConfig;
-  const resolved = buildResolved(configPath, config);
+  return buildResolved(configPath, config);
+}
 
-  // Verify repo directories exist
+/**
+ * Verify that be_repo, fe_repo, and tickets_dir exist on disk.
+ * Called only by `tandem run` — other commands must work on fresh clones
+ * where repos may not yet be set up.
+ * Throws TandemError with REPO_NOT_FOUND or TICKETS_DIR_NOT_FOUND.
+ */
+export async function verifyRepoPaths(resolved: ResolvedConfig): Promise<void> {
   for (const [label, repoPath] of [
     ['be_repo', resolved.beRepoPath],
     ['fe_repo', resolved.feRepoPath],
@@ -81,7 +88,6 @@ async function readAndValidate(configPath: string): Promise<ResolvedConfig> {
     }
   }
 
-  // Verify tickets directory exists
   try {
     await access(resolved.ticketsDir);
   } catch {
@@ -90,8 +96,6 @@ async function readAndValidate(configPath: string): Promise<ResolvedConfig> {
       'TICKETS_DIR_NOT_FOUND',
     );
   }
-
-  return resolved;
 }
 
 // ─── Public API ───────────────────────────────────────────────────────────────

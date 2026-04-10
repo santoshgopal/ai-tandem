@@ -41,6 +41,8 @@ export interface LoopOptions {
   dryRun: boolean;
   signal?: AbortSignal;
   logger?: Logger;
+  /** Absolute path to the PAUSE file. When omitted, derived from ticketsDir. */
+  pauseFilePath?: string;
 }
 
 export interface LoopResult {
@@ -59,8 +61,7 @@ function contractSchemaPath(): string {
   return join(__dirname, '..', 'schemas', 'contract.schema.json');
 }
 
-async function pauseFileExists(ticketsDir: string): Promise<boolean> {
-  const pausePath = join(ticketsDir, '..', '.tandem', 'PAUSE');
+async function pauseFileExists(pausePath: string): Promise<boolean> {
   try {
     await access(pausePath);
     return true;
@@ -88,6 +89,7 @@ const consoleFallback: Logger = {
 export async function runLoop(options: LoopOptions): Promise<LoopResult> {
   const { config, ticketsDir, dryRun, signal } = options;
   const out: Logger = options.logger ?? consoleFallback;
+  const pausePath = options.pauseFilePath ?? join(ticketsDir, '..', '.tandem', 'PAUSE');
   const result: LoopResult = { processed: 0, skipped: 0, failed: 0 };
 
   /** Emit an informational message, using dryRun prefix when appropriate. */
@@ -146,7 +148,7 @@ export async function runLoop(options: LoopOptions): Promise<LoopResult> {
     }
 
     // Check PAUSE file
-    if (await pauseFileExists(ticketsDir)) {
+    if (await pauseFileExists(pausePath)) {
       result.stoppedAt = ticket.id;
       emit('Paused. Run tandem resume to continue.');
       return result;

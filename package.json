@@ -25,19 +25,20 @@
   },
   "files": [
     "dist",
-    "schemas",
+    "schemas/*.schema.json",
     "templates",
     "README.md",
     "LICENSE"
   ],
   "scripts": {
-    "build": "tsc --project tsconfig.build.json && mkdir -p dist/schemas && cp schemas/*.schema.json dist/schemas/ && cp -r templates dist/templates",
+    "build": "tsc --project tsconfig.build.json && tsx scripts/copy-assets.ts",
     "dev": "tsx watch cli/index.ts",
     "start": "node dist/cli/index.js",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
+    "test:smoke": "npm run build && vitest run tests/integration/smoke.test.ts",
     "validate-schemas": "tsx scripts/validate-fixtures.ts",
     "clean": "rm -rf dist",
     "prepublishOnly": "npm run clean && npm run build && npm run typecheck && npm run test",

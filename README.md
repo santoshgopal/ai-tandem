@@ -152,7 +152,7 @@ Create `.tandem/config.json` in your workspace root (or run `tandem init`):
   "loop": true,
   "max_retries": 2,
   "open_prs": false,
-  "claude_model": "claude-sonnet-4-20250514"
+  "claude_model": "claude-sonnet-4-6"
 }
 ```
 

@@ -76,8 +76,8 @@
 
     "claude_model": {
       "type": "string",
-      "default": "claude-sonnet-4-20250514",
-      "description": "The Claude model to use for agent runs. Passed to the claude CLI via --model flag. Default: claude-sonnet-4-20250514. Use a more capable model (opus) for complex tickets."
+      "default": "claude-sonnet-4-6",
+      "description": "The Claude model to use for agent runs. Passed to the claude CLI via --model flag. Default: claude-sonnet-4-6. Use a more capable model (opus) for complex tickets."
     },
 
     "agent_timeout_minutes": {

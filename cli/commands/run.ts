@@ -7,7 +7,7 @@
 
 import { access } from 'node:fs/promises';
 import { createLogger } from '../logger.js';
-import { discoverConfig, loadConfigFromPath } from '../config-loader.js';
+import { discoverConfig, loadConfigFromPath, verifyRepoPaths } from '../config-loader.js';
 import { registerShutdownHandler, clearShutdownHandler } from '../shutdown.js';
 import { formatAndLogError } from '../error-formatter.js';
 import { runLoop } from '../../orchestrator/loop.js';
@@ -51,6 +51,15 @@ export async function runCommand(options: {
 
   const dryRun = options.dryRun === true;
 
+  // ── Verify repo paths ─────────────────────────────────────────────────────
+
+  try {
+    await verifyRepoPaths(resolved);
+  } catch (err) {
+    formatAndLogError(err, log);
+    process.exit(1);
+  }
+
   // ── Check PAUSE file ───────────────────────────────────────────────────────
 
   try {
@@ -85,6 +94,7 @@ export async function runCommand(options: {
       dryRun,
       signal,
       logger: log,
+      pauseFilePath: resolved.pauseFilePath,
     });
 
     // ── Print result summary ─────────────────────────────────────────────────
