@@ -35,7 +35,7 @@
     "dev": "tsx watch cli/index.ts",
     "start": "node dist/cli/index.js",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run",
+    "test": "npm run build && vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "test:smoke": "npm run build && vitest run tests/integration/smoke.test.ts",
