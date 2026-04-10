@@ -284,6 +284,15 @@ export async function runLoop(options: LoopOptions): Promise<LoopResult> {
           err instanceof ContractTimeoutError ||
           err instanceof ContractValidationError
         ) {
+          // Print schema errors so the user can fix the contract
+          if (err instanceof ContractValidationError && err.errors.length > 0) {
+            out.error(`contract.json failed validation for ${ticket.id}:`);
+            for (const e of err.errors) {
+              const path = (e as Record<string, unknown>)['instancePath'] ?? '';
+              const msg = (e as Record<string, unknown>)['message'] ?? String(e);
+              out.info(`  • ${path} ${msg}`);
+            }
+          }
           await sm.transition('error', { reason: err.message });
           result.failed++;
           if (pauseOnError) {

@@ -35,6 +35,7 @@ const VALID_TRANSITIONS = new Set<string>([
   'be-working→contract-ready',
   'be-working→error',
   'contract-ready→fe-working',
+  'contract-ready→error',
   'fe-working→done',
   'fe-working→error',
   'error→queued',

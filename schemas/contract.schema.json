@@ -245,10 +245,17 @@
         },
         {
           "type": "object",
-          "required": ["type", "properties"],
+          "required": ["type"],
           "properties": {
             "type": { "type": "string", "enum": ["object"] },
             "properties": { "type": "object", "additionalProperties": { "$ref": "#/$defs/TypeDef" } },
+            "additionalProperties": {
+              "oneOf": [
+                { "type": "boolean" },
+                { "$ref": "#/$defs/TypeDef" }
+              ],
+              "description": "For dynamic key maps (Record<string, T>). Use instead of properties when keys are not known at design time."
+            },
             "required": { "type": "array", "items": { "type": "string" } },
             "description": { "type": "string" }
           }
