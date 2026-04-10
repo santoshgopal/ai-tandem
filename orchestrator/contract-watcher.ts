@@ -30,15 +30,38 @@ export async function waitForContract(
   ticketId: string,
   timeoutMinutes: number,
 ): Promise<Contract> {
-  // Fast path: file already exists
+  // Fast path: file already exists — validate and return immediately.
+  // If the file exists but fails validation, throw right away rather than
+  // falling through to the watcher (which would block forever on a stable file).
   try {
     await access(contractPath);
+    // File exists — attempt to read and validate
     const raw = await readFile(contractPath, 'utf8');
-    const parsed: unknown = JSON.parse(raw);
-    validateContract(parsed);
-    return parsed as Contract;
-  } catch {
-    // File doesn't exist or validation failed — proceed to watch
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(raw);
+    } catch {
+      throw new ContractValidationError(
+        `contract.json contains invalid JSON for ticket ${ticketId}`,
+        ticketId,
+        [],
+      );
+    }
+    try {
+      validateContract(parsed);
+      return parsed as Contract;
+    } catch (err) {
+      const errors = err instanceof ValidationError ? err.errors : [];
+      throw new ContractValidationError(
+        `contract.json failed schema validation for ticket ${ticketId}`,
+        ticketId,
+        errors,
+      );
+    }
+  } catch (err) {
+    // Re-throw ContractValidationError — file exists but is invalid
+    if (err instanceof ContractValidationError) throw err;
+    // Otherwise file doesn't exist yet — fall through to watcher
   }
 
   const dir = dirname(contractPath);
@@ -51,7 +74,7 @@ export async function waitForContract(
 
     const watcher = chokidar.watch(dir, {
       persistent: true,
-      ignoreInitial: false,
+      ignoreInitial: true,
       awaitWriteFinish: {
         stabilityThreshold: 500,
         pollInterval: 100,
@@ -87,7 +110,7 @@ export async function waitForContract(
           cleanup();
           reject(
             new ContractValidationError(
-              `contract.json at ${contractPath} contains invalid JSON after 3 attempts for ticket ${ticketId}`,
+              `contract.json contains invalid JSON after 3 attempts for ticket ${ticketId}`,
               ticketId,
               [],
             ),
@@ -115,7 +138,7 @@ export async function waitForContract(
             ),
           );
         }
-        // Otherwise wait for next write event
+        // Otherwise wait for next write event (agent may still be writing)
       }
     }
 
@@ -127,17 +150,18 @@ export async function waitForContract(
       reject(new ContractTimeoutError(ticketId, timeoutMinutes));
     }, timeoutMs);
 
-    // Watch for add/change events matching the exact contract file
+    // Watcher ready — do one final check in case the file appeared between
+    // the fast-path access() check and now (closes the setup race window)
+    watcher.on('ready', () => {
+      void tryValidate();
+    });
+
     watcher.on('add', (filePath: string) => {
-      if (filePath === contractPath) {
-        void tryValidate();
-      }
+      if (filePath === contractPath) void tryValidate();
     });
 
     watcher.on('change', (filePath: string) => {
-      if (filePath === contractPath) {
-        void tryValidate();
-      }
+      if (filePath === contractPath) void tryValidate();
     });
 
     watcher.on('error', (err: unknown) => {

@@ -98,6 +98,10 @@ export async function runAgentWithRetry(
           console.log(
             `[tandem] ${agentOptions.role} agent attempt ${attempts} failed: ${errSummary}`,
           );
+          // Print stderr from Claude so the user can see the actual error
+          if (err instanceof AgentRunError && err.stderr.trim()) {
+            console.error(`[tandem] claude stderr:\n${err.stderr.trim()}`);
+          }
           console.log(
             `[tandem] Retrying in ${delay / 1000}s (attempt ${attempts + 1} of ${maxRetries + 1})...`,
           );
@@ -113,6 +117,10 @@ export async function runAgentWithRetry(
           continue;
         }
 
+        // Print stderr on final failure too
+        if (err instanceof AgentRunError && err.stderr.trim()) {
+          console.error(`[tandem] claude stderr (final attempt):\n${err.stderr.trim()}`);
+        }
         throw new MaxRetriesExceededError(
           agentOptions.ticketId,
           agentOptions.role,

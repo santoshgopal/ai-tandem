@@ -9,17 +9,19 @@
  * Errors: throws TicketReadError, ValidationError, or CircularDependencyError.
  */
 
-import { readdir, readFile, access } from 'node:fs/promises';
-import type { Dirent } from 'node:fs';
-import { join } from 'node:path';
-import type { Ticket, TicketStatusRecord } from '../schemas/index.js';
-import { validateTicket, validateStatus } from './schema-validator.js';
-import { TicketReadError, CircularDependencyError } from './errors.js';
+import type { Dirent } from "node:fs";
+import { access, readFile, readdir } from "node:fs/promises";
+import { join } from "node:path";
+import type { Ticket, TicketStatusRecord } from "../schemas/index.js";
+import { CircularDependencyError, TicketReadError } from "./errors.js";
+import { validateStatus, validateTicket } from "./schema-validator.js";
 
 // ─── Exported types ───────────────────────────────────────────────────────────
 
 export interface LoadedTicket {
   ticket: Ticket;
+  /** Effective status from status.json. Falls back to ticket.status if status.json is absent or invalid. */
+  effectiveStatus: Ticket["status"];
   ticketDir: string;
   contractPath: string;
   statusPath: string;
@@ -84,17 +86,20 @@ export async function loadTickets(ticketsDir: string): Promise<TicketQueue> {
   } catch {
     throw new TicketReadError(
       `Tickets directory not found: ${ticketsDir}`,
-      '<unknown>',
+      "<unknown>",
     );
   }
 
   let entries: Dirent<string>[];
   try {
-    entries = await readdir(ticketsDir, { withFileTypes: true, encoding: 'utf8' });
+    entries = await readdir(ticketsDir, {
+      withFileTypes: true,
+      encoding: "utf8",
+    });
   } catch (err) {
     throw new TicketReadError(
       `Failed to read tickets directory ${ticketsDir}: ${String(err)}`,
-      '<unknown>',
+      "<unknown>",
     );
   }
 
@@ -109,13 +114,13 @@ export async function loadTickets(ticketsDir: string): Promise<TicketQueue> {
 
   for (const dir of dirs) {
     const ticketDir = join(ticketsDir, dir.name);
-    const ticketPath = join(ticketDir, 'ticket.json');
-    const statusPath = join(ticketDir, 'status.json');
-    const contractPath = join(ticketDir, 'contract.json');
+    const ticketPath = join(ticketDir, "ticket.json");
+    const statusPath = join(ticketDir, "status.json");
+    const contractPath = join(ticketDir, "contract.json");
 
     let raw: string;
     try {
-      raw = await readFile(ticketPath, 'utf8');
+      raw = await readFile(ticketPath, "utf8");
     } catch {
       throw new TicketReadError(
         `Could not read ticket.json in directory '${dir.name}'. Expected file at: ${ticketPath}`,
@@ -145,7 +150,14 @@ export async function loadTickets(ticketsDir: string): Promise<TicketQueue> {
     }
 
     ticketMap.set(ticket.id, ticket);
-    loadedTickets.push({ ticket, ticketDir, contractPath, statusPath });
+    // effectiveStatus is patched in after status.json is read below
+    loadedTickets.push({
+      ticket,
+      effectiveStatus: ticket.status,
+      ticketDir,
+      contractPath,
+      statusPath,
+    });
   }
 
   // Validate all depends_on references exist
@@ -168,7 +180,7 @@ export async function loadTickets(ticketsDir: string): Promise<TicketQueue> {
   for (const loaded of loadedTickets) {
     let statusRaw: string | null = null;
     try {
-      statusRaw = await readFile(loaded.statusPath, 'utf8');
+      statusRaw = await readFile(loaded.statusPath, "utf8");
     } catch {
       // status.json doesn't exist → treat as queued
     }
@@ -178,7 +190,7 @@ export async function loadTickets(ticketsDir: string): Promise<TicketQueue> {
       try {
         statusParsed = JSON.parse(statusRaw);
       } catch {
-        effectiveStatus.set(loaded.ticket.id, 'queued');
+        effectiveStatus.set(loaded.ticket.id, "queued");
         continue;
       }
       try {
@@ -186,11 +198,17 @@ export async function loadTickets(ticketsDir: string): Promise<TicketQueue> {
         const record = statusParsed as TicketStatusRecord;
         effectiveStatus.set(loaded.ticket.id, record.current);
       } catch {
-        effectiveStatus.set(loaded.ticket.id, 'queued');
+        effectiveStatus.set(loaded.ticket.id, "queued");
       }
     } else {
-      effectiveStatus.set(loaded.ticket.id, 'queued');
+      effectiveStatus.set(loaded.ticket.id, "queued");
     }
+  }
+
+  // Patch effectiveStatus onto each LoadedTicket now that we have the map
+  for (const loaded of loadedTickets) {
+    const es = effectiveStatus.get(loaded.ticket.id) ?? "queued";
+    loaded.effectiveStatus = es as Ticket["status"];
   }
 
   // Build the queue
@@ -201,18 +219,18 @@ export async function loadTickets(ticketsDir: string): Promise<TicketQueue> {
 
   const doneIds = new Set<string>();
   for (const loaded of loadedTickets) {
-    const status = effectiveStatus.get(loaded.ticket.id) ?? 'queued';
-    if (status === 'done') {
+    const status = effectiveStatus.get(loaded.ticket.id) ?? "queued";
+    if (status === "done") {
       doneIds.add(loaded.ticket.id);
     }
   }
 
   for (const loaded of loadedTickets) {
-    const status = effectiveStatus.get(loaded.ticket.id) ?? 'queued';
+    const status = effectiveStatus.get(loaded.ticket.id) ?? "queued";
 
-    if (status === 'done') {
+    if (status === "done") {
       done.push(loaded);
-    } else if (status === 'error') {
+    } else if (status === "error") {
       errored.push(loaded);
     } else {
       const deps = loaded.ticket.depends_on ?? [];

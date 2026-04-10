@@ -63,6 +63,7 @@ program
   .option('--loop', 'override config: keep processing until queue is empty')
   .option('--loop-until <ticketId>', 'stop after completing this ticket ID')
   .option('--quiet', 'suppress agent output, show only phase transitions')
+  .option('--verbose', 'stream every line of agent output to the terminal in real time')
   .action(
     (options: {
       config?: string;
@@ -71,6 +72,7 @@ program
       loop?: boolean;
       loopUntil?: string;
       quiet?: boolean;
+      verbose?: boolean;
     }) => runCommand(options).catch(handleTopLevelError),
   );
 

@@ -126,16 +126,6 @@ export async function initCommand(options: { config?: string }): Promise<void> {
 
   try {
     await copyDirectory(exampleSrc, exampleDest);
-    // Reset status.json to queued state with no transitions
-    await writeFile(
-      join(exampleDest, 'status.json'),
-      JSON.stringify(
-        { ticket_id: 'DEMO-1', current: 'queued', transitions: [] },
-        null,
-        2,
-      ),
-      'utf8',
-    );
     log.success(`Created ${exampleDest}/ (example ticket)`);
   } catch (err) {
     log.warn(`Could not copy example ticket: ${String(err)}`);

@@ -64,7 +64,7 @@ export async function validateCommand(options: {
     process.exit(1);
   }
 
-  // Merge all ticket groups
+  // Merge all ticket groups (order: executable first, then blocked, done, errored)
   const allTickets = [
     ...queue.executable,
     ...queue.blocked,
@@ -84,7 +84,7 @@ export async function validateCommand(options: {
   let invalidCount = 0;
 
   for (const loaded of allTickets) {
-    const { ticket } = loaded;
+    const { ticket, effectiveStatus } = loaded;
     const deps = ticket.depends_on ?? [];
 
     let depStatus = '(no deps)';
@@ -98,7 +98,7 @@ export async function validateCommand(options: {
     }
 
     log.info(
-      `${chalk.green('✓')}  ${ticket.id.padEnd(10)} ${ticket.title.slice(0, 38).padEnd(38)} ${ticket.status.padEnd(16)} ${depStatus}`,
+      `${chalk.green('✓')}  ${ticket.id.padEnd(10)} ${ticket.title.slice(0, 38).padEnd(38)} ${effectiveStatus.padEnd(16)} ${depStatus}`,
     );
     validCount++;
   }

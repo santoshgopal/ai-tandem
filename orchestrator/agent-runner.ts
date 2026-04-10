@@ -15,6 +15,7 @@
 
 import { spawn } from 'node:child_process';
 import { AgentRunError, AgentTimeoutError } from './errors.js';
+import type { Logger } from '../types/logger.interface.js';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -27,6 +28,8 @@ export interface AgentRunOptions {
   timeoutMinutes: number;
   allowedTools?: string[];
   dryRun?: boolean;
+  /** Stream agent stdout/stderr lines to this logger as they arrive. */
+  logger?: Logger;
 }
 
 export interface AgentRunResult {
@@ -53,32 +56,28 @@ export async function runAgent(options: AgentRunOptions): Promise<AgentRunResult
     timeoutMinutes,
     allowedTools = DEFAULT_TOOLS,
     dryRun = false,
+    logger,
   } = options;
 
   // Dry run mode — log and return without spawning
   if (dryRun) {
-    const truncated = prompt.length > 500 ? prompt.slice(0, 500) + `\n... [${prompt.length - 500} more characters]` : prompt;
+    const truncated = prompt.length > 500
+      ? prompt.slice(0, 500) + `\n... [${prompt.length - 500} more characters]`
+      : prompt;
     console.log(`[DRY RUN] Would run ${role} agent for ${ticketId}`);
     console.log(`[DRY RUN] Model: ${model}`);
-    console.log(`[DRY RUN] Repo: ${repoPath}`);
+    console.log(`[DRY RUN] Repo:  ${repoPath}`);
     console.log(`[DRY RUN] Prompt (first 500 chars):\n${truncated}`);
-    return {
-      ticketId,
-      role,
-      exitCode: 0,
-      stdout: '',
-      stderr: '',
-      durationMs: 0,
-      timedOut: false,
-    };
+    return { ticketId, role, exitCode: 0, stdout: '', stderr: '', durationMs: 0, timedOut: false };
   }
 
+  // claude --print <prompt> runs non-interactively and exits when done.
+  // --output-format text ensures plain text output (not JSON).
   const args = [
-    '--headless',
-    '--print',
+    '--print', prompt,
     '--model', model,
     '--allowedTools', allowedTools.join(','),
-    '--no-update-check',
+    '--output-format', 'text',
   ];
 
   const startMs = Date.now();
@@ -88,20 +87,29 @@ export async function runAgent(options: AgentRunOptions): Promise<AgentRunResult
 
   const child = spawn('claude', args, {
     cwd: repoPath,
-    stdio: ['pipe', 'pipe', 'pipe'],
+    stdio: ['ignore', 'pipe', 'pipe'],
     env: process.env,
   });
 
-  // Write prompt to stdin and close
-  child.stdin.write(prompt);
-  child.stdin.end();
-
-  // Collect output
+  // Collect output; optionally stream each line to the logger
   child.stdout.on('data', (chunk: Buffer) => {
-    stdoutBuf += chunk.toString();
+    const text = chunk.toString();
+    stdoutBuf += text;
+    if (logger) {
+      for (const line of text.split('\n')) {
+        if (line.trim()) logger.agent(role, line);
+      }
+    }
   });
+
   child.stderr.on('data', (chunk: Buffer) => {
-    stderrBuf += chunk.toString();
+    const text = chunk.toString();
+    stderrBuf += text;
+    if (logger) {
+      for (const line of text.split('\n')) {
+        if (line.trim()) logger.agent(role, `[stderr] ${line}`);
+      }
+    }
   });
 
   // Timeout logic
@@ -112,26 +120,20 @@ export async function runAgent(options: AgentRunOptions): Promise<AgentRunResult
     killTimer = setTimeout(async () => {
       timedOut = true;
       child.kill('SIGTERM');
-      // Give 5 seconds for graceful exit
       await new Promise<void>((res) => setTimeout(res, 5000));
-      if (!child.killed) {
-        child.kill('SIGKILL');
-      }
+      if (!child.killed) child.kill('SIGKILL');
       reject(new AgentTimeoutError(ticketId, timeoutMinutes, role));
     }, timeoutMs);
   });
 
   const runPromise = new Promise<number>((resolve) => {
-    child.on('close', (code) => {
-      resolve(code ?? 1);
-    });
+    child.on('close', (code) => resolve(code ?? 1));
   });
 
   let exitCode: number;
   try {
     exitCode = await Promise.race([runPromise, timeoutPromise]);
   } catch (err) {
-    // Clear timer if it somehow didn't fire
     if (killTimer !== null) clearTimeout(killTimer);
     throw err;
   }
@@ -149,13 +151,5 @@ export async function runAgent(options: AgentRunOptions): Promise<AgentRunResult
     );
   }
 
-  return {
-    ticketId,
-    role,
-    exitCode,
-    stdout: stdoutBuf,
-    stderr: stderrBuf,
-    durationMs,
-    timedOut,
-  };
+  return { ticketId, role, exitCode, stdout: stdoutBuf, stderr: stderrBuf, durationMs, timedOut };
 }

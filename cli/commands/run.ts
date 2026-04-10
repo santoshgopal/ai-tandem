@@ -19,6 +19,7 @@ export async function runCommand(options: {
   loop?: boolean;
   loopUntil?: string;
   quiet?: boolean;
+  verbose?: boolean;
 }): Promise<void> {
   const log = createLogger(options.quiet === true ? { quiet: true } : undefined);
 
@@ -81,7 +82,7 @@ export async function runCommand(options: {
   log.info(`Config:   ${resolved.configPath}`);
   log.info(`Tickets:  ${ticketsDir}`);
   log.info(
-    `Mode:     loop=${String(config.loop ?? false)}, dry-run=${String(dryRun)}`,
+    `Mode:     loop=${String(config.loop ?? false)}, dry-run=${String(dryRun)}, verbose=${String(options.verbose === true)}`,
   );
   log.blank();
 
@@ -95,6 +96,7 @@ export async function runCommand(options: {
       signal,
       logger: log,
       pauseFilePath: resolved.pauseFilePath,
+      ...(options.verbose === true ? { verbose: true } : {}),
     });
 
     // ── Print result summary ─────────────────────────────────────────────────

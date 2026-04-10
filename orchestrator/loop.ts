@@ -43,6 +43,8 @@ export interface LoopOptions {
   logger?: Logger;
   /** Absolute path to the PAUSE file. When omitted, derived from ticketsDir. */
   pauseFilePath?: string;
+  /** Stream every line of agent stdout/stderr to the logger in real time. */
+  verbose?: boolean;
 }
 
 export interface LoopResult {
@@ -89,6 +91,7 @@ const consoleFallback: Logger = {
 export async function runLoop(options: LoopOptions): Promise<LoopResult> {
   const { config, ticketsDir, dryRun, signal } = options;
   const out: Logger = options.logger ?? consoleFallback;
+  const agentLogger = options.verbose === true ? out : undefined;
   const pausePath = options.pauseFilePath ?? join(ticketsDir, '..', '.tandem', 'PAUSE');
   const result: LoopResult = { processed: 0, skipped: 0, failed: 0 };
 
@@ -162,94 +165,115 @@ export async function runLoop(options: LoopOptions): Promise<LoopResult> {
     }
     firstTicket = false;
 
-    out.phase(`▶ Starting ticket ${ticket.id}: ${ticket.title}`);
-
     const sm = new TicketStateMachine(statusPath, ticket.id);
 
-    // ── BACKEND PHASE ──────────────────────────────────────────────────────────
+    // Read current state to determine if this is a fresh start or a resume
+    const currentState = await sm.currentState();
+    const isResume = currentState === 'be-working'
+      || currentState === 'contract-ready'
+      || currentState === 'fe-working';
 
-    if (!dryRun) {
-      await sm.transition('be-working', { reason: 'Backend agent starting' });
-      await sm.updateRunMeta('be', {
-        branch: `${branchPrefix}${ticket.id}-be`,
-        started_at: new Date().toISOString(),
-        completed_at: null,
-        exit_code: null,
-        retry_count: 0,
-        commit: null,
-      });
+    if (isResume) {
+      out.phase(`↩ Resuming ticket ${ticket.id} from ${currentState}: ${ticket.title}`);
     } else {
-      out.dryRun(`Would transition ${ticket.id} → be-working`);
+      out.phase(`▶ Starting ticket ${ticket.id}: ${ticket.title}`);
     }
 
-    const bePrompt = buildBackendPrompt(ticket, contractPath, contractSchemaPath());
+    // ── BACKEND PHASE ─────────────────────────────────────────────────────────
+    // Skip entirely when resuming from contract-ready or fe-working.
 
-    let beResult;
-    try {
-      beResult = await runAgentWithRetry(
-        {
-          ticketId: ticket.id,
-          role: 'be',
-          repoPath: config.be_repo,
-          prompt: bePrompt,
-          model,
-          timeoutMinutes: agentTimeout,
-          dryRun,
-        },
-        sm,
-        maxRetries,
-        signal,
-      );
-    } catch (err) {
-      if (err instanceof MaxRetriesExceededError) {
-        if (!dryRun) {
-          await sm.transition('error', {
-            reason: err.message,
-          });
+    if (currentState !== 'contract-ready' && currentState !== 'fe-working') {
+      if (!dryRun) {
+        // Seed status.json if it doesn't exist yet
+        if ((await sm.read()) === null) {
+          await sm.transition('queued');
         }
-        result.failed++;
-        if (pauseOnError) {
-          emit(`Paused on error for ticket ${ticket.id}: ${err.message}`);
-          result.stoppedAt = ticket.id;
-          return result;
+        // Only transition if not already in be-working (resume case)
+        if (currentState !== 'be-working') {
+          await sm.transition('be-working', { reason: 'Backend agent starting' });
+        } else {
+          emit(`Resuming backend agent for ${ticket.id} (was interrupted at be-working)`);
         }
-        emit(`Skipping errored ticket ${ticket.id}: ${err.message}`);
-        continue;
+        await sm.updateRunMeta('be', {
+          branch: `${branchPrefix}${ticket.id}-be`,
+          started_at: new Date().toISOString(),
+          completed_at: null,
+          exit_code: null,
+          retry_count: 0,
+          commit: null,
+        });
+      } else {
+        out.dryRun(`Would transition ${ticket.id} → be-working`);
       }
-      if (
-        err instanceof InvalidTransitionError ||
-        err instanceof StateWriteError
-      ) {
-        out.error(`[tandem] Fatal error: ${err.message}`);
+
+      const bePrompt = buildBackendPrompt(ticket, contractPath, contractSchemaPath());
+
+      let beResult;
+      try {
+        beResult = await runAgentWithRetry(
+          {
+            ticketId: ticket.id,
+            role: 'be',
+            repoPath: config.be_repo,
+            prompt: bePrompt,
+            model,
+            timeoutMinutes: agentTimeout,
+            dryRun,
+            ...(agentLogger !== undefined ? { logger: agentLogger } : {}),
+          },
+          sm,
+          maxRetries,
+          signal,
+        );
+      } catch (err) {
+        if (err instanceof MaxRetriesExceededError) {
+          if (!dryRun) {
+            await sm.transition('error', { reason: err.message });
+          }
+          result.failed++;
+          if (pauseOnError) {
+            emit(`Paused on error for ticket ${ticket.id}: ${err.message}`);
+            result.stoppedAt = ticket.id;
+            return result;
+          }
+          emit(`Skipping errored ticket ${ticket.id}: ${err.message}`);
+          continue;
+        }
+        if (
+          err instanceof InvalidTransitionError ||
+          err instanceof StateWriteError
+        ) {
+          out.error(`[tandem] Fatal error: ${err.message}`);
+          throw err;
+        }
         throw err;
       }
-      throw err;
-    }
 
-    if (!dryRun) {
-      await sm.updateRunMeta('be', {
-        completed_at: new Date().toISOString(),
-        exit_code: beResult.exitCode,
-        commit: null, // parsed from stdout if visible
-      });
-      const beParsed = parseAgentOutput(beResult.stdout);
-      await writeAudit(
-        ticketDir,
-        'be',
-        ticket,
-        beResult,
-        beParsed,
-        new Date().toISOString(),
-      );
+      if (!dryRun) {
+        await sm.updateRunMeta('be', {
+          completed_at: new Date().toISOString(),
+          exit_code: beResult.exitCode,
+          commit: null,
+        });
+        const beParsed = parseAgentOutput(beResult.stdout);
+        await writeAudit(ticketDir, 'be', ticket, beResult, beParsed, new Date().toISOString());
+      }
+    } else {
+      emit(`Skipping backend phase for ${ticket.id} — already at ${currentState}`);
     }
 
     // ── CONTRACT PHASE ────────────────────────────────────────────────────────
+    // Skip transition if already at contract-ready or fe-working.
 
-    if (!dryRun) {
-      await sm.transition('contract-ready');
+    if (currentState !== 'fe-working') {
+      if (!dryRun) {
+        if (currentState !== 'contract-ready') {
+          await sm.transition('contract-ready');
+        }
+      }
+
+      emit(`⏳ Waiting for contract.json at ${contractPath}...`);
     }
-
-    emit(`⏳ Waiting for contract.json at ${contractPath}...`);
 
     let contract;
     if (!dryRun) {
@@ -276,7 +300,6 @@ export async function runLoop(options: LoopOptions): Promise<LoopResult> {
       out.dryRun(
         `Would wait for contract.json at ${contractPath} (timeout: ${contractTimeout}m)`,
       );
-      // In dry-run mode, build a minimal contract from the example for prompt building
       contract = null;
     }
 
@@ -285,6 +308,12 @@ export async function runLoop(options: LoopOptions): Promise<LoopResult> {
     out.phase(`▶ Starting frontend agent for ${ticket.id}`);
 
     if (!dryRun) {
+      // Only transition if not already in fe-working (resume case)
+      if (currentState !== 'fe-working') {
+        await sm.transition('fe-working');
+      } else {
+        emit(`Resuming frontend agent for ${ticket.id} (was interrupted at fe-working)`);
+      }
       await sm.updateRunMeta('fe', {
         branch: `${branchPrefix}${ticket.id}-fe`,
         started_at: new Date().toISOString(),
@@ -314,6 +343,7 @@ export async function runLoop(options: LoopOptions): Promise<LoopResult> {
           model,
           timeoutMinutes: agentTimeout,
           dryRun,
+          ...(agentLogger !== undefined ? { logger: agentLogger } : {}),
         },
         sm,
         maxRetries,
