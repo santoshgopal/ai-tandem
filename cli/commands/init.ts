@@ -107,7 +107,7 @@ export async function initCommand(options: { config?: string }): Promise<void> {
     branch_prefix: 'tandem/',
     open_prs: false,
     pr_base_branch: 'main',
-    claude_model: 'claude-sonnet-4-20250514',
+    claude_model: 'claude-sonnet-4-6',
     agent_timeout_minutes: 30,
     contract_timeout_minutes: 35,
   };
